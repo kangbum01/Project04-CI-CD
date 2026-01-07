@@ -1,3 +1,4 @@
+### 구성
 music_project/
 └── infra/
     ├── inventory/
