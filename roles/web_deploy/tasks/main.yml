@@ -1,0 +1,23 @@
+# LB서버에 결과 web 파일을 배포
+---
+- name: Deploy web file
+  hosts: LB_Server
+  become: yes
+  tasks:
+    - name: Ensure target directory exists on LB server
+      ansible.builtin.file:
+        path: "/home/ansible-admin/music_project"
+        state: directory
+        owner: ansible-admin
+        group: ansible-admin
+        mode: '0755'     # 디렉토리는 실행 권한(7)이 필요합니다.
+
+    - name: Copy web contents to LB server
+      ansible.builtin.copy:
+        # 젠킨스 워크스페이스 내의 web/ 폴더 안의 내용물을 복사합니다.
+        src: /var/lib/jenkins/workspace/Music-Service-Deploy/web
+        dest: /tmp
+        owner: ansible-admin
+        group: ansible-admin
+        mode: '0755'     # 파일은 읽기 권한(6)이면 충분합니다.
+  

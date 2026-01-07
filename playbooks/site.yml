@@ -1,0 +1,17 @@
+---
+# - name: "Step 1: 공통 환경 설정"
+#   hosts: teammates
+#   become: true
+#   roles:
+#     - role: "../roles/common"
+
+- name: "Step 2: Git 저장소 연결 - AI 서버"
+  hosts: AI_Server
+  become: true
+  roles:
+    - role: "roles/ai_analysis"
+
+# - name: "Step 3: Jenkins CI/CD 서버 구축"
+#   hosts: localhost
+#   roles:
+#     - role: "../jenkins_setup"

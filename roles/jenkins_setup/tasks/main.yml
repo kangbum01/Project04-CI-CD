@@ -1,0 +1,65 @@
+# 사용법
+# ansible-playbook -i hosts.ini install_Jenkins.yaml
+# firefox http://본인IP &
+---
+- name: "Jenkins Perfect Automation"
+  hosts: localhost
+  become: true
+  vars:
+    # 사용자 지정 아이디 비밀번호
+    admin_id: "bumseok"
+    admin_pw: "1234"
+    jenkins_home: "/home/ansible-admin/jenkins_data"
+
+  tasks:
+    - name: "1. 디렉토리 생성 및 권한 설정"
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: 1000
+        group: 1000
+      with_items:
+        - "{{ jenkins_home }}/casc_configs"
+        - "{{ jenkins_home }}/init.groovy.d"
+
+    - name: "2. JCasC 설정 및 토큰 스크립트 배치"
+      template:
+        src: "templates/{{ item.src }}"
+        dest: "{{ jenkins_home }}/{{ item.dest }}"
+      with_items:
+        - { src: 'jenkins.yaml.j2', dest: 'casc_configs/jenkins.yaml' }
+        - { src: 'setup-token.groovy.j2', dest: 'init.groovy.d/setup-token.groovy' }
+
+    - name: "3. 커스텀 젠킨스 이미지 빌드 및 실행"
+      community.docker.docker_container:
+        name: jenkins-server
+        image: custom-jenkins:latest
+        build:
+          path: .
+        state: started
+        restart_policy: always
+        ports:
+          - "8080:8080"
+        env:
+          JENKINS_ADMIN_ID: "{{ admin_id }}"
+          JENKINS_ADMIN_PW: "{{ admin_pw }}"
+          JAVA_OPTS: "-Djenkins.install.runSetupWizard=false"
+        volumes:
+          - "{{ jenkins_home }}:/var/jenkins_home"
+          - "/home/ansible-admin:/home/ansible-admin" # 호스트의 ansible 설정 공유
+          - "/home/ansible-admin/.ssh:/var/jenkins_home/.ssh" # SSH 접근 권한 연동
+
+    - name: "4. 토큰 추출 및 변수 저장"
+      wait_for:
+        path: "{{ jenkins_home }}/api_token.txt"
+        timeout: 60
+
+    - name: "5. 토큰 값 변수 등록"
+      slurp:
+        src: "{{ jenkins_home }}/api_token.txt"
+      register: token_raw
+
+    - name: "6. 최종 결과 출력"
+      debug:
+        msg: "자동화 완료! 토큰: {{ token_raw['content'] | b64decode }}"
+        

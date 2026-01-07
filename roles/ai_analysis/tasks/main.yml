@@ -1,0 +1,9 @@
+---
+# Step 1: AI 서버 기초 환경 설치
+# 해당 태스크가 실행되지 않을 경우 ai와 git의 연결을 실행되지 않습니다
+- name: "Step 1.AI 서버 환경 구축"
+  ansible.builtin.import_tasks: setup_ai.yml
+
+# Step 2: AI 서버와 Git의 연결
+- name: "Step 2.AI 서버와 local git 연결"
+  ansible.builtin.import_tasks: ai_connect_git.yml

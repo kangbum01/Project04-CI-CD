@@ -1,0 +1,83 @@
+jenkins:
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "${JENKINS_ADMIN_ID}"
+          password: "${JENKINS_ADMIN_PW}"
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousJobStatusPermission: false
+  
+  # 전역 환경 변수 설정 (Ansible 실행용)
+  globalNodeProperties:
+    - envVars:
+        env:
+          - key: "ansible"
+            value: "/usr/bin/ansible-playbook"
+          - key: "PYTHONPATH"
+            value: "/home/ansible-admin/.local/lib/python3.9/site-packages"
+          - key: "ANSIBLE_HOST_KEY_CHECKING"
+            value: "False"
+
+# 보안 설정: 로컬 Git 체크아웃 허용 (아까 발생한 에러 해결)
+unclassified:
+  gitSCM:
+    allowLocalCheckout: true
+  location:
+    url: http://localhost:8080/
+
+# 파이프라인 Job 자동 생성
+jobs:
+  - script: >
+      pipelineJob('Music-Service-Deploy') {
+        definition {
+          cps {
+            script("""
+              pipeline {
+                agent any
+                environment {
+                  // 실패 로그 저장 경로 정의
+                  ERROR_LOG_PATH = "/home/ansible-admin/project/logs/deploy_error_\${BUILD_NUMBER}.log"
+                }
+                stages {
+                  stage('Checkout') {
+                    steps {
+                      git branch: 'main', url: 'file:///home/ansible-admin/project/git/music-project.git'
+                    }
+                  }
+                  stage('Deploy to Web Server') {
+                    steps {
+                      sh '''
+                      export PYTHONPATH=/home/ansible-admin/.local/lib/python3.9/site-packages
+                      export ANSIBLE_HOST_KEY_CHECKING=False
+                      # Ansible 실행 결과를 tee 명령어로 화면과 파일 양쪽에 출력
+                      \${ansible} -i /home/ansible-admin/project/init_setting/hosts.ini \
+                      /home/ansible-admin/project/init_setting/deploy.yaml | tee ansible_output.log
+                      '''
+                    }
+                  }
+                }
+                // [추가] 빌드 결과에 따른 후속 조치
+                post {
+                  success {
+                    echo '🎉 배포 성공! 웹 페이지가 정상적으로 업데이트되었습니다.'
+                  }
+                  failure {
+                    echo '🚨 배포 실패! 에러 원인을 분석하여 로그를 저장합니다.'
+                    sh '''
+                    mkdir -p /home/ansible-admin/project/logs
+                    # 실패한 시점의 Ansible 로그를 에러 로그 폴더로 복사
+                    cp ansible_output.log \${ERROR_LOG_PATH}
+                    echo "에러 로그 위치: \${ERROR_LOG_PATH}"
+                    '''
+                  }
+                  always {
+                    echo '빌드 과정 종료 (Build #\${BUILD_NUMBER})'
+                  }
+                }
+              }
+            """.stripIndent())
+          }
+        }
+      }
